@@ -1,0 +1,78 @@
+name: build-mesa-spoof
+
+  "on":
+    workflow_dispatch:
+
+  jobs:
+    build:
+      runs-on: windows-latest
+      defaults:
+        run:
+          shell: "msys2 {0}"
+
+      steps:
+        - name: Checkout (gets patch_getstring.py)
+          uses: actions/checkout@v4
+
+        - name: Set up MSYS2 + build deps
+          uses: msys2/setup-msys2@v2
+          with:
+            msystem: MINGW64
+            update: true
+            install: >-
+              git
+              mingw-w64-x86_64-gcc
+              mingw-w64-x86_64-meson
+              mingw-w64-x86_64-ninja
+              mingw-w64-x86_64-pkgconf
+              mingw-w64-x86_64-python
+              mingw-w64-x86_64-python-mako
+              mingw-w64-x86_64-llvm
+              mingw-w64-x86_64-zlib
+              mingw-w64-x86_64-zstd
+              mingw-w64-x86_64-expat
+              mingw-w64-x86_64-libxml2
+              flex
+              bison
+
+        - name: Clone Mesa
+          run: git clone --depth 1 https://gitlab.freedesktop.org/mesa/mesa.git
+
+        - name: Apply MESA_RENDERER / MESA_VENDOR patch
+          run: python patch_getstring.py mesa/src/mesa/main/getstring.c
+
+        - name: Configure (meson)
+          run: |
+            cd mesa
+            meson setup builddir \
+              -Dbuildtype=release \
+              -Dgallium-drivers=llvmpipe \
+              -Dvulkan-drivers= \
+              -Dglx=disabled \
+              -Degl=disabled \
+              -Dgbm=disabled \
+              -Dosmesa=true \
+              -Dshared-glapi=enabled \
+              -Dllvm=enabled \
+              -Dgles1=disabled \
+              -Dgles2=enabled \
+              -Dc_link_args=-static \
+              -Dcpp_link_args=-static
+
+        - name: Build (ninja)
+          run: |
+            cd mesa
+            ninja -C builddir
+
+        - name: Collect the DLL
+          run: |
+            mkdir -p out
+            find mesa/builddir -name 'opengl32.dll' -exec cp -v {} out/ \;
+            ls -la out
+
+        - name: Upload artifact
+          uses: actions/upload-artifact@v4
+          with:
+            name: opengl32-dll
+            path: out/opengl32.dll
+            if-no-files-found: error
