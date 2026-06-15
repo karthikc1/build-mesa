@@ -1,6 +1,6 @@
 name: build-mesa-spoof
 
-  "on":
+  on:
     workflow_dispatch:
 
   jobs:
@@ -8,7 +8,7 @@ name: build-mesa-spoof
       runs-on: windows-latest
       defaults:
         run:
-          shell: "msys2 {0}"
+          shell: msys2 {0}
 
       steps:
         - name: Checkout (gets patch_getstring.py)
